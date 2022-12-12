@@ -1,1 +1,1 @@
-# Social-Network-Analysis---MSc-thesis
+# Social Network Analysis - MSc thesis
