@@ -1,0 +1,3500 @@
+---
+title: "Social Networks and Spatial Mobility"
+
+
+subtitle: <span class="sub_h2">Lika Zhvania | 29.08.2022<br/></span><br/><span class="sub_h1">MSc thesis:<br/></span><span class="sub_h2">'Connecting social network to mobility - comparison of the spatial pattern of mobility and the location of call partners based on passive mobile positioning dataset'</span><br/><br/><span class="sub_h2">MSc, Geoinformatics for Urbanised Society<br/>Department of Geography, University of Tartu</span>
+
+output: 
+  html_document:
+    toc: true # table of contents TOC
+    toc_depth: 3 # depth of headers | 3 is default and means that all level 1, 2, and 3 headers will be included in TOC
+    toc_float: true # to float the table of contents to the left of the main document content
+    number_sections: true # section numbering to headers
+    theme: spacelab # specifies the Bootstrap theme to use for the page
+    highlight: monochrome # specifies the syntax highlighting style
+    
+    fig_caption: true # controls whether figures are rendered with captions
+    
+    df_print: paged  # tables are printed as HTML tables with support for pagination over rows and columns
+    code_folding: hide # code_folding: hide - enables to include R code but have it hidden by default
+    keep_md: true # to keep a copy of the Markdown file after rendering
+    
+    css: "style.css"
+    
+---
+
+# Project description {}
+
+
+# Data {}
+
+
+## Data description
+
+
+
+<p1>The primary data which is used in the thesis research, is the passive mobile positioning data, in particular, Call Detail Records (CDR), Call Graph. The data is obtained by the mobile network operators and contains information about the time and location of the call, identifications of the call initiator and receiver. The locations of the calls are aggregated by the closest antenna that receives the signal from while calling. The data has dyadic characteristics.</p1>
+
+## Libraries and Tools
+
+<p1>The list of libraries that is or might be used during analysis:</p1>
+
+
+```{r include=TRUE, echo=TRUE}
+# Main
+#library(rmarkdown) # dynamic documents for R, combining code, rendered output and prose.
+#library(tidyverse) # an opinionated collection of R packages designed for data science
+#library(sf) # Simple features: support for simple features, a standardized way to encode spatial vector data
+#library(lubridate) # to work with dates and times
+#library(stringr)  # for manipulations on text
+#library(ggplot2) # visualization package
+#library(hrbrthemes) # additional themes and theme components for ggplot2
+#library(scales) # for determining breaks and labels for axes and legends
+#library(geosphere) # to calculate distance
+#library(igraph) # to create and manipulate graphs and analyse networks
+#library(ggpubr) # 'ggplot2' Based Publication Ready Plots
+
+# OPTIONAL
+#library(DBI) # for using SQL
+#library(rcompanion)  ## to plot Normal Distribution over Histogram so histogram gives the real values of plotted bars and the overlay density plot shows normal distribution trends
+#library(tcltk) # is needed for tkplot() and tkigraph() to work
+#library(rgl) # is needed for rglplot() to work
+#library(ape) # is needed to plot nice dendrograms with plot_dendogram()
+
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+# Main
+library(rmarkdown) # dynamic documents for R, combining code, rendered output and prose.
+library(tidyverse) # an opinionated collection of R packages designed for data science
+library(sf) # Simple features: support for simple features, a standardized way to encode spatial vector data
+library(lubridate) # to work with dates and times
+library(stringr)  # for manipulations on text
+library(ggplot2) # visualization package
+library(hrbrthemes) # additional themes and theme components for ggplot2
+library(scales) # for determining breaks and labels for axes and legends
+library(geosphere) # to calculate distance
+library(igraph) # to create and manipulate graphs and analyse networks
+library(ggpubr) # 'ggplot2' Based Publication Ready Plots
+
+# OPTIONAL
+#library(DBI) # for using SQL
+#library(rcompanion)  ## to plot Normal Distribution over Histogram so histogram gives the real values of plotted bars and the overlay density plot shows normal distribution trends
+#library(tcltk) # is needed for tkplot() and tkigraph() to work
+#library(rgl) # is needed for rglplot() to work
+#library(ape) # is needed to plot nice dendrograms with plot_dendogram()
+
+```
+
+<p1>To prevent scientific notation, 'options' function is used and scipen id defined to print numeric values in fixed notation:<txt_highlight style ="font-weight:bold;"> options(scipen = 999)</p1>
+
+```{r message=FALSE, warning=FALSE}
+options(scipen = 999)
+
+```
+
+
+## Mobile data
+
+<p1>Mobile data frame</p1>
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Read data
+mob_data <- read_delim("Data\\working\\dat_smpl_lika_1mo.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+```
+
+
+```{r message=FALSE, warning=FALSE, echo=TRUE, max.print=10}
+# mob_data <- read_delim("Data\\working\\dat_smpl_lika_1mo.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+
+# replace the user ID values for displaying
+repl <- head(mob_data, 1)
+repl$op_pos_usr_id <- "xxxxxxxx"
+repl$op_pos_usr_id_rec <- "xxxxxxxx"
+repl
+```
+
+
+## Additional data
+
+<p1>Additional datasets that might be useful for understanding the context</p1>
+
+<txt_highlight>Counties<br>Municipalities<br>Settlement units<br>Population (2019)<br>Population density</txt_highlight>
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+# Counties
+count <- st_read('Data/working/spatial/maakond_shp/maakond_20220601.shp') %>% 
+  st_transform(crs = 3301)
+
+# Municipalities
+munic <- st_read('Data/working/spatial/omavalitsus_shp/omavalitsus_20220601.shp') %>% 
+  st_transform(crs = 3301)
+
+# Settlement units (2022)
+settl <- st_read('Data/working/spatial/asustusyksus_shp/asustusyksus_20220601.shp') %>% 
+  st_transform(crs = 3301)
+
+# Population (2019)
+pop_2019 <- st_read('Data/working/spatial/asustus_rahvaarv_2019_kaardirakendus/asustus_rahvaarv_2019.shp') %>% 
+  st_transform(crs = 3301)
+
+
+```
+
+
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+# Counties
+#count <- read_sf('Data/working/spatial/maakond_shp/maakond_20220601.shp') %>% st_transform(crs = 3301)
+
+# Municipalities
+#munic <- read_sf('Data/working/spatial/omavalitsus_shp/omavalitsus_20220601.shp') %>% st_transform(crs = 3301)
+
+# Settlement units (2022)
+#settlm <- read_sf('Data/working/spatial/asustusyksus_shp/asustusyksus_20220601.shp') %>% st_transform(crs = 3301)
+
+# Population (2019)
+#pop_2019 <- read_sf('Data/working/spatial/asustus_rahvaarv_2019_kaardirakendus/asustus_rahvaarv_2019.shp') %>% st_transform(crs = 3301)
+
+
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+settl_plot <- 
+  ggplot() +  
+  geom_sf(data = settl, fill = "#EABE94", color = "white", alpha = 0.7, size = 0.001) + 
+  geom_sf(data = munic, fill = NA, color = "#969696", size = 0.5) +
+  geom_sf(data = count, fill = NA, color = "#969696", size = 1) + 
+  geom_sf_text(data = count, aes(label = str_sub(MNIMI, end = -8)), color = "#737373", size = 4) + 
+  labs(title = "Settlement units of Estonia") + 
+  theme_minimal() + 
+  theme(plot.title = element_text(face = "bold", color = "#525252", size = 10), 
+        panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        axis.title = element_blank(), 
+        axis.text = element_blank(), 
+        legend.position = "none")
+
+pop_2019_plot <- 
+  ggplot() + 
+  geom_sf(data = pop_2019, aes(fill = VAARTUS), color = NA) + 
+  scale_fill_gradientn(colours = c("#ece2f0", "#a6bddb", "#3690c0", "#016c59", "#014636"), na.value = "#d9d9d9") + 
+  labs(fill = "Population number", 
+       title = "Population distribution in Estonia, 2019") + 
+  theme_minimal() + 
+  theme(plot.title = element_text(face = "bold", color = "#525252", size = 10),
+        panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        axis.text = element_blank())
+
+
+```
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, out.width="100%", out.height="100%"}
+
+# Plot spatial data
+settl_plot
+```
+
+## Settlement types
+
+<p1>Settlements contain the information about type</p1>
+
+<p2>Settlement type is coded by EHAK as follows:</p2>
+
+<p3>0 - county<br>1 - rural municipality<br>3 - town<br>4 - city<br>5 - city without municipal status<br>6 - city district<br>7 - small town<br>8 - village</p3>
+
+<p2>Data source: Geoportal, Republic of Estonia LAND BOARD<br>[Geoportal](geoportaal.maaamet.ee/eng/Spatial-Data/Administrative-and-Settlement-Division-p312.html)</p2>
+
+
+<p2>Check unique values of settlement types to see which types are represented in the dataset</p2>
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+settl_types_UV <- unique(settl$TYYP)
+
+cat(' The codes indicating the types of settlements of Estonia, are following:', sort(as.integer(settl_types_UV)))
+```
+
+<p1>Assign appropriate type names to EHAK codes in new fields called settl_type (urban & rural) and settl_hier (urban: big city, urban: small city, rural)</p1>
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Settlement types
+# Urban
+urban <- settl$TYYP %in% c(3, 4, 5, 6, 7)
+# Rural
+rural <- settl$TYYP %in% c(8)
+
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Urban
+settl[urban, ]
+# Rural
+settl[rural, ]
+
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# assign new values
+settl$settl_type[urban] <- "urban"
+settl$settl_type[rural] <- "rural"
+
+
+settl$settl_hier <- settl$settl_type
+settl$settl_hier <- ifelse(settl$settl_hier == 'urban', 'urban: small city', settl$settl_hier)
+
+
+# Big cities: Tallinn, Tartu, Narva, Pärnu, Kohtla-Järve, Jõhvi
+# Tallinn
+settl$settl_hier <- ifelse(settl$ONIMI == 'Tallinn', 'urban: big city', settl$settl_hier)
+# Tartu
+settl$settl_hier <- ifelse(settl$ONIMI == 'Tartu linn' & settl$TYYP == '5', 'urban: big city', settl$settl_hier)
+# Narva
+settl$settl_hier <- ifelse(settl$ONIMI == 'Narva linn', 'urban: big city', settl$settl_hier)
+# Pärnu
+settl$settl_hier <- ifelse(settl$ONIMI == 'Pärnu linn' & settl$TYYP == '5', 'urban: big city', settl$settl_hier)
+# Kohtla-Järve
+settl$settl_hier <- ifelse(settl$ONIMI == 'Kohtla-Järve linn', 'urban: big city', settl$settl_hier)
+# Jõhvi
+settl$settl_hier <- ifelse(settl$ONIMI == 'Jõhvi vald' & settl$TYYP == '5', 'urban: big city', settl$settl_hier)
+```
+
+```{r message=FALSE, warning=FALSE, include=TRUE, max.rows=5}
+# check newly assigned fields
+head(settl, 1)
+```
+
+<p1>Plot settlement types</p1>
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+settl_plot <- 
+  ggplot() +  
+  
+  geom_sf(data = settl, aes(fill = settl_hier), color = NA, size = 0.1) + 
+  scale_fill_manual(breaks = c("urban: big city", "urban: small city", "rural"), 
+                    values = c("#C93312", "yellow", "#74A089")) + 
+  scale_color_manual(breaks = c("urban: big city", "urban: small city", "rural"), 
+                     values = c("black", "blue", "white")) + 
+  labs(fill = "Settlement type", 
+       title = "Types of settlements in Estonia | Urban & Rural") + 
+  theme_minimal() + 
+  theme(plot.title = element_text(face = "bold", color = "#525252", size = 14), 
+        panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        axis.text = element_blank())
+
+settl_plot
+```
+
+
+
+# Data preparation {}
+## Fix coordinates and rename columns
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# fix coordinates
+mob_data <- mob_data %>% 
+  mutate(
+    lon_x = as.character(lat) %>% 
+      str_pad(3, side = "left", pad = "0") %>% 
+      str_replace("(\\w{2})", "\\1\\.") %>% 
+      as.numeric(), 
+    lat_y = as.character(lon) %>% 
+      str_pad(3, side = "left", pad = "0") %>% 
+      str_replace("(\\w{2})", "\\1\\.") %>% 
+      as.numeric()
+  )
+```
+
+<p1>To make dataset headers readable, it is better to change the names of the first and second users</p1>
+<p2>'op_pos_usr_id' is replaced with 'caller' & 'op_pos_usr_id_rec' with 'callee'</p2>
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# rename columns
+colnames(mob_data)[which(names(mob_data) == 'op_pos_usr_id')] <- 'caller'
+colnames(mob_data)[which(names(mob_data) == 'op_pos_usr_id_rec')] <- 'callee'
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# replace the user ID values for displaying
+repl <- head(mob_data, 1)
+repl$caller <- "xxxxxxxx"
+repl$callee <- "xxxxxxxx"
+repl
+```
+
+
+## Time variables
+
+<p1>Create time variables</p1>
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# time variables
+mob_data <- mob_data %>% 
+  mutate(
+    year = year(pos_time), 
+    month = month(pos_time), 
+    day = day(pos_time), 
+    wday = lubridate::wday(pos_time, label = FALSE, week_start = getOption("lubridate.week.start", 1)), 
+    wday_attr = lubridate::wday(pos_time, label = TRUE, abbr = FALSE), 
+    hour = hour(pos_time), 
+    hour_rounded = hour(round_date(pos_time, "hour")), 
+    min = minute(pos_time), 
+    sec = second(pos_time), 
+    hour_min = hour + min/60
+  )
+```
+
+
+<p1>Sort mobile data by user id (caller) and time</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+mob_data <- mob_data[order(mob_data$caller, mob_data$pos_time), ]
+```
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# replace the user ID values for displaying
+repl <- head(mob_data, 1)
+repl$caller <- "xxxxxxxx"
+repl$callee <- "xxxxxxxx"
+repl
+```
+
+
+## Join mobile dataset with settlement types
+
+<p2>First, create x/y fields to use them for creating geometry and keep also them separately</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+mob_data <- mob_data %>% 
+  mutate(x = lon_x, 
+         y = lat_y)
+```
+
+<p2>Convert data to sf format to use it later for joining</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+mob_data_sf <- st_as_sf(mob_data, coords = c("x", "y"),  crs = 4326)  %>% 
+  st_transform(crs = 3301)
+```
+
+
+<p2>Join mobile data with settlement types by using st_join() and join = st_intersects for 'point in polygon' spatial relationship</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+joined <- st_join(mob_data_sf, settl, 
+                  join = st_intersects, 
+                  left = TRUE)
+
+```
+
+
+<p2>Locate x/y from geometry into separate column by using unlist() and map()</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+joined <- joined %>% 
+  mutate(x = unlist(map(joined$geometry, 1)), 
+         y = unlist(map(joined$geometry, 2)))
+```
+
+
+<p2>Drop the geometry column</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+mob_data <- joined %>% 
+  st_drop_geometry()
+
+class(mob_data)
+```
+
+
+<p2>Backup the original dataset (mob_data) separately and use mob_data for analysis</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+mob_data_bu <- mob_data
+```
+
+
+<p2>Check new variables</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# replace the user ID values for displaying
+repl <- head(mob_data, 1)
+repl$caller <- "xxxxxxxx"
+repl$callee <- "xxxxxxxx"
+repl
+```
+
+
+# Distribution of calls
+
+<p1>YEAR</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+distr_year <-  mob_data %>% 
+  group_by(year) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+
+cat('The YEAR of mobile data distribution is:', as.character(unique(distr_year$year))) 
+```
+ 
+
+<p1>MONTH</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+distr_month <-  mob_data %>% 
+  group_by(month) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+
+cat('The MONTH of mobile data distribution is:', as.character(unique(unique(month(distr_month$month,label = TRUE, abbr = FALSE)))))
+```
+ 
+
+<p1>DAY</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+distr_day <-  mob_data %>% 
+  group_by(day, wday, wday_attr) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+
+cat('The DAY of mobile data distribution is:', as.character(unique(distr_day$day))) 
+cat('Total number of days:', nrow(distr_day))
+```
+ 
+
+<p1>Plot distribution of calls by days</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+distr_day_plot <- 
+  ggplot(data = distr_day, 
+         aes(x = day, y = n_calls)) + 
+  geom_bar(stat = "identity", fill = '#899DA4') + 
+  geom_text(aes(label = substr(wday_attr, 1, 3)), vjust = -0.5) + 
+  labs(title = 'Distribution of calls by days', 
+       x = 'Date: February', 
+       y = 'Number of calls') + 
+  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 
+                                21, 22, 23, 24, 25, 26, 27, 28)) + 
+  scale_y_continuous(breaks = c(1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 1900000, 2000000, 
+                              2100000, 2200000), 
+                   labels = c('1,000,000', '1,100,000', '1,200,000', '1,300,000', '1,400,000', '1,500,000', 
+                              '1,600,000', '1,700,000', '1,800,000', '1,900,000', '2,000,000', '2,100,000', '2,200,000'))
+
+distr_day_plot
+```
+ 
+
+<p1>Average number of daily calls</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+distr_day_avr <-  distr_day %>% 
+  summarise(avr_calls = mean(n_calls))
+
+cat('Average number of daily calls:', distr_day_avr$avr_calls)
+```
+ 
+
+
+<p1>Average number of daily calls by workdays and weekends</p1>
+<p2>/nWorkdays</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# select working days
+distr_day_working <- distr_day %>%
+  filter(wday < 6 )
+
+distr_day_working_avr <- distr_day_working %>% 
+  summarise(day = "Working days",
+    avr_calls = mean(n_calls))
+
+cat('Average number of daily calls during working days:', distr_day_working_avr$avr_calls)
+```
+ 
+
+<p2>Weekends</p2>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# select weekends
+distr_day_weekend <- distr_day %>%
+  filter(wday > 5 )
+
+distr_day_weekend_avr <- distr_day_weekend %>% 
+  summarise(day = "Weekends",
+    avr_calls = mean(n_calls))
+
+cat('Average number of daily calls during weekends:', distr_day_weekend_avr$avr_calls)
+```
+ 
+
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+distr_day_work_weekend_plot <- 
+  ggplot() + 
+  geom_bar(data = distr_day_working_avr, aes(x = day, y = avr_calls), stat = "identity", fill = '#C93312', width = 0.3) + 
+  geom_text(data = distr_day_working_avr, aes(x = day, y = avr_calls, label = round(avr_calls)), vjust = -0.5) + 
+  
+  geom_bar(data = distr_day_weekend_avr, aes(x = day, y = avr_calls), stat = "identity", fill = '#899DA4', width = 0.3) + 
+  geom_text(data = distr_day_weekend_avr, aes(x = day, y = avr_calls, label = round(avr_calls)), vjust = -0.5) + 
+  
+  labs(title = 'Average distribution of daily calls compared between working days and weekends', 
+       x = '', 
+       y = '') + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.background = element_blank())
+
+distr_day_work_weekend_plot
+```
+ 
+
+
+<p1>Number of calls by users</p1>
+```{r message=FALSE, warning=FALSE, echo=TRUE, message=FALSE, warning=FALSE, out.height="100%", out.width="100%"}
+distr_day_caller <-  mob_data %>% 
+  group_by(caller, day, wday) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+
+
+
+distr_day_caller_plot <- 
+  ggplot(data = distr_day_caller, aes(y = n_calls)) + 
+  geom_boxplot(show.legend = FALSE) + 
+  facet_grid(~day, switch = "x") + 
+  ggtitle("Distribution of the number of Daily Calls by callers") + 
+  ylab("Number of calls") + 
+  scale_y_continuous(breaks = c(100, 500, 1000, 2000, 3000, 4000, 5000)) + 
+  theme_ipsum() + 
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank()
+  )
+
+distr_day_caller_plot
+```
+
+
+<p1>Distribution of weekdays in the the dataset</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+distr_wday <-  distr_day %>% 
+  group_by(wday_attr) %>% 
+  summarise(n_wdays = n()) %>% 
+  ungroup()
+
+
+wdays <- gather(distr_wday, 
+       key = "wday_attr", 
+       value = "n_wdays")
+wdays
+unique(wdays$n_wdays)
+```
+ 
+
+<p1>Distribution of calls by hours</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+calls_by_hours <- 
+  ggplot(data = mob_data %>% 
+           group_by(hour_rounded) %>% 
+           summarise(n_calls = n()) %>% 
+           ungroup(), 
+         aes(x = hour_rounded, y = n_calls)) + 
+  geom_line(size = 2, color = '#046C9A') + 
+  labs(title = 'Distribution of calls by hours for whole period', 
+       x = 'Time', 
+       y = 'Number of calls') + 
+  scale_x_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24)) + 
+  scale_y_continuous(labels = comma)
+
+calls_by_hours
+```
+ 
+
+
+<p1>Average distribution of calls by hours</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+calls_by_hours_avr <- 
+  ggplot(data = mob_data %>% 
+           group_by(day, hour_rounded) %>% 
+           summarise(n_calls = n()) %>% 
+           group_by(hour_rounded) %>% 
+           summarise(avr_calls = mean(n_calls)) %>%
+           ungroup(), 
+         aes(x = hour_rounded, y = avr_calls)) + 
+  geom_line(size = 2, color = '#046C9A') + 
+  labs(title = 'Average distribution of calls by hours aggregated by days', 
+       x = 'Time', 
+       y = 'Number of calls') + 
+  scale_x_continuous(breaks = seq(0, 24, 3)) + 
+  scale_y_continuous(labels = comma)
+
+calls_by_hours_avr
+```
+ 
+
+
+<p1>Distribution of calls by weekdays</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+calls_wday <- 
+  mob_data %>% 
+  group_by(wday_attr, hour_rounded) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+
+calls_wday$wday_attr <- factor(calls_wday$wday_attr, c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+
+calls_by_hours_wdays <- 
+  ggplot(data = calls_wday, 
+         aes(x = hour_rounded, y = n_calls, group = wday_attr)) + 
+  geom_line(size = 2, color = '#046C9A') + 
+  facet_grid(~wday_attr) + 
+  labs(title = 'Average distribution of calls by hours aggregated by weekdays', 
+       x = 'Time', 
+       y = 'Number of calls') + 
+  scale_x_continuous(breaks = seq(0, 24, 2)) + 
+  scale_y_continuous(labels = comma)
+
+calls_by_hours_wdays
+```
+
+
+# Filtering
+## Daily calls
+
+<p1>Number of daily calls by callers to understand how many calls each user makes in a day</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+daily_call_numb <- mob_data %>% 
+  group_by(caller, day) %>% 
+  summarise(n_calls = n())
+```
+
+
+<p1>Calculate median and mean of daily calls</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+median_daily_calls <- median(daily_call_numb$n_calls)
+mean_daily_calls <- mean(daily_call_numb$n_calls)
+
+cat(' The median of daily calls made by callers:', median_daily_calls, 
+    '\n', 'The mean of daily calls made by callers:', round(mean_daily_calls, 1))
+```
+ 
+<p1>Calculate percentiles of daily calls</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+calls_percentiles <- quantile(daily_call_numb$n_calls, probs = c(0.25, 0.5, 0.9, 0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999))
+calls_prcnt <- quantile(daily_call_numb$n_calls, probs = c(0.9999))
+
+cat('Percentiles of daily calls made by callers:', '\n')
+calls_percentiles
+calls_prcnt
+```
+ 
+<p1>Draw histogram of daily calls</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+hist(daily_call_numb$n_calls, probability = TRUE,  
+     main = 'Daily calls made by callers', 
+     xlab = 'Number of calls', 
+     xlim = c(1, 8882), 
+     col = '#9A8822', 
+     border = "#9A8822", 
+     breaks = c(1, 100, 500, 1000, 5000, 8000, 8882), 
+     xaxt = 'n')
+axis(side = 1,  
+     at = c(1, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 8882), 
+     labels = c(1, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 8882), 
+     line = 0.5)
+lines(density(daily_call_numb$n_calls), col = "yellow", lwd = 2)
+abline(v = median(daily_call_numb$n_calls),
+       col = "#F2300F", 
+       lwd = 3)
+text(median(daily_call_numb$n_calls), y=0.01, as.character(median(daily_call_numb$n_calls)), pos = 2, col = "#F2300F")
+abline(v = calls_prcnt, 
+       col = "#00A08A", 
+       lwd = 2,
+       lty = 4)
+text(calls_prcnt, y=0.01, "99.99%: 207", col = "#00A08A", pos = 2, offset = -5)
+
+```
+
+
+<p1>Draw histogram of daily calls with log10</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+hist(log10(daily_call_numb$n_calls), probability = TRUE,  
+     main = 'Daily calls made by callers', 
+     xlab = 'Number of calls: log10()', 
+     col = '#9A8822', 
+     border = "#9A8822")
+abline(v = median(daily_call_numb$n_calls),
+       col = "#F2300F", 
+       lwd = 4)
+text(median(daily_call_numb$n_calls), y=1.22, as.character(median(daily_call_numb$n_calls)), pos = 2, col = "#F2300F")
+
+```
+
+
+<p1>Filter out observations with number of calls that fall under 207</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+to_remove <- daily_call_numb %>% 
+  filter(n_calls >= 207)
+
+# the number of observations that equals and fall over 207 score of daily calls equals 952 rows, that needs to be removed
+
+daily_call_numb <- daily_call_numb %>% 
+  filter(n_calls < 207)
+```
+
+<p1>Draw histogram again</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+hist(daily_call_numb$n_calls, probability = TRUE,  
+     main = 'Daily calls made by callers', 
+     xlab = 'Number of calls', 
+     col = '#9A8822', 
+     border = "#9A8822", 
+     xaxt = 'n')
+axis(side = 1,  
+     at = c(1, 30, 43, 70, 77, 98, 154, 206), 
+     labels = c(1, 30, 43, 70, 77, 98, 154, 206), 
+     line = 0.5)
+abline(v = quantile(daily_call_numb$n_calls, probs = c(0.989, 0.995, 0.9986, 0.999, 0.9995, 0.9999)), 
+       col = "#00A08A", 
+       lwd = 2,
+       lty = 4)
+text(quantile(daily_call_numb$n_calls, probs = c(0.989, 0.995, 0.9986, 0.999, 0.9995, 0.9999)), 
+     y=0.08, c("98.9%", "99.5%", "99.86%", "99.9%", "99.95%", "99.99%"), col = "#02401B", pos = 1, offset = -5)
+```
+
+
+
+<p1>Filter out observations with number of calls that fall under 70</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+to_remove <- daily_call_numb %>% 
+  filter(n_calls >= 30)
+# the number of observations that equals and fall over 70 score of daily calls equals 13,813 rows, that needs to be removed
+
+daily_call_numb <- daily_call_numb %>% 
+  filter(n_calls < 30)
+```
+
+
+
+<p1>Plot the distribution of filtered dataset</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+daily_calls_boxplot <- 
+  ggplot(daily_call_numb, aes(y = n_calls, fill = "#FDDDA0")) + 
+  geom_boxplot(show.legend = FALSE) + 
+  ggtitle("Distribution of the number of Daily Calls by callers") + 
+  ylab("Number of calls") + 
+  scale_y_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29)) + 
+  theme_ipsum() + 
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank()
+  )
+
+daily_calls_boxplot
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+daily_calls_days_boxplot <- 
+  ggplot(daily_call_numb, aes(y = n_calls, fill = "#FDDDA0")) + 
+  geom_boxplot(show.legend = FALSE) + 
+  facet_grid(~day, switch = "x") +  
+  ggtitle("Distribution of the number of Daily Calls by callers") + 
+  ylab("Number of calls") + 
+  scale_y_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29)) + 
+  theme_ipsum() + 
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank()
+  )
+
+daily_calls_days_boxplot
+```
+
+
+<p1>Now, from mob_data filter out the observations of callers with less than 30 daily calls</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# concatenate columns op_pos_usr_id_rec and day into new column user_day | then use new column to filter out
+mob_data$user_day <- str_c(as.character(mob_data$caller), "-", as.character(mob_data$day))
+daily_call_numb$user_day <- str_c(as.character(daily_call_numb$caller), "-", as.character(daily_call_numb$day))
+
+# filter
+mob_data <- mob_data %>% 
+  filter(mob_data$user_day %in% daily_call_numb$user_day)
+```
+
+
+## Diurnal rhythm of calling activities
+
+<p1>Draw histogram with 'hour' variable</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+par(lwd=0.01) # set line width
+hist(mob_data$hour, probability = TRUE,  
+     main = 'Diurnal rhythm of calling activities', 
+     xlab = 'Time | Hour', 
+     xlim = c(0, 24), 
+     col = '#FDDDA0', 
+     border = "#FAD77B", 
+     breaks = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     xaxt = 'n')
+axis(side = 1,  
+     at = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     labels = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     line = 0.5)
+abline(v = median(mob_data$hour),
+       col = "#F2300F", 
+       lwd = 3)
+text(median(mob_data$hour), y=0.08, "Median", pos = 1, offset = -3, col = "black")
+
+abline(v = quantile(mob_data$hour, probs = c(0.016)), 
+       col = "#00A08A", 
+       lwd = 2,
+       lty = 4)
+text(quantile(mob_data$hour, probs = c(0.016)), y=0.08, c("1.6%"), 
+     col = "black", pos = 1, offset = -3)
+```
+
+
+<p1>Draw histogram with 'hour_rounded' variable</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+par(lwd=0.01) # set line width
+hist(mob_data$hour_rounded, probability = TRUE,  
+     main = 'Diurnal rhythm of calling activities', 
+     xlab = 'Time | Hour (rounded)', 
+     xlim = c(0, 24), 
+     col = '#FDDDA0', 
+     border = "#FAD77B", 
+     breaks = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     xaxt = 'n')
+axis(side = 1,  
+     at = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     labels = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     line = 0.5)
+abline(v = median(mob_data$hour_rounded),
+       col = "#F2300F", 
+       lwd = 3)
+text(median(mob_data$hour_rounded), y=0.079, "Median", pos = 1, offset = -3, col = "black")
+
+abline(v = quantile(mob_data$hour_rounded, probs = c(0.02)), 
+       col = "#00A08A", 
+       lwd = 2,
+       lty = 4)
+text(quantile(mob_data$hour_rounded, probs = c(0.02)), y=0.079, c("2%"), 
+     col = "black", pos = 1, offset = -3)
+```
+
+
+<p1>Draw histogram with 'hour_min' variable</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+par(lwd=0.01) # set line width
+hist(mob_data$hour_min, probability = TRUE,  
+     main = 'Diurnal rhythm of calling activities', 
+     xlab = 'Time | hh:mm', 
+     xlim = c(0, 24), 
+     col = '#FDDDA0', 
+     border = "#FAD77B", 
+     breaks = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     xaxt = 'n')
+axis(side = 1,  
+     at = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     labels = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), 
+     line = 0.5)
+abline(v = median(mob_data$hour_min),
+       col = "#F2300F", 
+       lwd = 3)
+text(median(mob_data$hour_min), y=0.08, "Median", pos = 1, offset = -3, col = "black")
+
+abline(v = quantile(mob_data$hour_min, probs = c(0.016)), 
+       col = "#00A08A", 
+       lwd = 2,
+       lty = 4)
+text(quantile(mob_data$hour_min, probs = c(0.016)), y=0.08, c("1.6%"), 
+     col = "black", pos = 1, offset = -3)
+```
+
+
+<p1>Remove the observations that occur after midnight till 6 AM</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# the number observations that falls under 6 AM
+to_remove <- mob_data %>% 
+  filter(hour_min < 6)
+
+mob_data <- mob_data %>% 
+  filter(hour_min >= 6)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# In 'hour_rounded' variable, for midnight zero (0) is assigned. However, as I have removed all the variables under 6 AM, there is
+# a gap between midnight and 6 AM, thus it is more reseanable to to give new value that is 24 to midnight instead of 0
+mob_data$hour_rounded <- ifelse(mob_data$hour_rounded == 0, 24, mob_data$hour_rounded)
+
+
+```
+
+
+
+<p1>Aggregate data hours (rounded)</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+hourly_calls_plot <- 
+  ggplot(data = mob_data %>% 
+         group_by(hour_rounded) %>% 
+         summarise(n_calls = n()) %>%
+         ungroup(), 
+       aes(x = hour_rounded, y = n_calls)) + 
+  geom_line(size = 2, color = '#046C9A') + 
+  labs(title = 'Distribution of calls by hours', 
+       x = 'Time: Hour', 
+       y = 'Number of calls') + 
+  scale_x_continuous(breaks = c(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24)) + 
+  scale_y_continuous(breaks = c(100000, 500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000), 
+                   labels = comma) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+hourly_calls_plot
+```
+
+
+<p1>Aggregate data by weekday and hour (rounded)</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+hourly_calls_wday <- mob_data %>% 
+  group_by(wday_attr, hour_rounded) %>% 
+  summarise(n_calls = n()) %>%
+  ungroup()
+
+
+hourly_calls_wday$wday_attr <- factor(hourly_calls_wday$wday_attr, c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+
+hourly_calls_wday_plot <- 
+  ggplot(data = hourly_calls_wday, 
+         aes(x = hour_rounded, y = n_calls)) + 
+  geom_line(size = 2, color = '#046C9A') + 
+  facet_grid(~wday_attr) + 
+  labs(title = 'Distribution of calls by hours and weekdays', 
+       x = 'Time: Hour', 
+       y = 'Number of calls') + 
+  scale_x_continuous(breaks = c(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24)) + 
+  scale_y_continuous(labels = comma) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+hourly_calls_wday_plot
+```
+
+
+# Home locations
+## Filtering
+<p1>Plot data with boxplot</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+# Concentration of calls by diurnal rhythm
+diurnal_rhythm_plot <- 
+  ggplot(mob_data, aes(y = hour_rounded, fill = "#FDDDA0")) + 
+  geom_boxplot(show.legend = FALSE) + 
+  ggtitle("Diurnal rhythm of calling activities") + 
+  ylab("Hour") + 
+  scale_y_continuous(breaks = c(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24)) + 
+  theme_ipsum() + 
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank()
+  )
+
+diurnal_rhythm_plot
+
+```
+
+
+<p1>Observations that needs to me ecxluded</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+to_remove <- mob_data %>% 
+  filter(hour_rounded >= 11 & hour_rounded <= 17)
+```
+
+<p1>Keep observations for which calls are made before 11 AM and 5 PM</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+home_locations <- mob_data %>% 
+  filter(hour_rounded < 11 | hour_rounded > 17)
+```
+
+
+<p1>Check unique values of hours to make sure filtering results are correct</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+sort(unique(home_locations$hour_rounded))
+```
+
+## Aggregation
+
+<p1>Aggregate 'home_locations' data by caller, antenna and day</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+caller_antenna_day <- home_locations %>% 
+  group_by(caller, site_id, lon_x, lat_y, day) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+```
+
+
+
+<p1>Aggregate 'caller_antenna_day' by caller and antenna so it is possible to count the frequency of days the caller has made the calls from the same antenna</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+antenna_days <- caller_antenna_day %>% 
+  group_by(caller, site_id) %>% 
+  summarise(n_days = n()) %>% 
+  ungroup()
+```
+
+
+<p1>Calculate quantiles</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+quantiles <- data.frame(quantiles_name = names(summary(antenna_days$n_days)), 
+                        quantiles_values = as.numeric(summary(antenna_days$n_days)))
+quantiles_med_thirdq <- quantiles %>% 
+  filter(quantiles_name == 'Median' | quantiles_name == '3rd Qu.')
+```
+
+
+<p1>Plot frequency of days</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+day_freq <- 
+  ggplot(data = antenna_days, aes(x = "", y = n_days)) + 
+  
+  
+  
+  geom_jitter(position = position_jitter(0.35), 
+              size = 1,
+              colour= '#FAD510', alpha = 0.1, 
+              show.legend = FALSE) + 
+  
+  geom_boxplot(lwd=1, fill = NA, alpha=0.8) + 
+  
+  ggtitle("Frequency of active calling days by each caller and antenna") + 
+  ylab("Number of days") + 
+  scale_y_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28)) + 
+  theme_ipsum() + 
+  theme( 
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(), 
+    legend.position = 'none'
+  )
+
+
+day_freq
+#ggsave('day_freq.png', units = 'cm', width = 40, height = 40)
+```
+
+
+<p1>50% of calls from the same antennas are made only for one day, 75% are made for three days. We can't assume the antenna as home location if calling activitiy from it is made only once, twice or three times, as it contains the possibility of irregular, random call activity and not necessarily refer to frequent calling behaviour of the caller.</p1>
+
+<p1>/nWe need to omit the observations of 2-day calling activities</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+to_remove <- antenna_days %>% 
+  filter(n_days < 4)
+
+antenna_days <- antenna_days %>% 
+  filter(n_days > 3)
+```
+
+
+
+<p1>Now check from how many antennas the user has made calls (then choose the most frequent antennas)</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+# frequency of antennas by users
+antenna_freq <- antenna_days %>% 
+  group_by(caller) %>% 
+  summarise(n_antennas = n()) %>% 
+  ungroup()
+
+# plot frequency of antennas
+antenna_freq_plot <- 
+  ggplot(data = antenna_freq, aes(x = "", y = n_antennas)) + 
+  
+  geom_jitter(position = position_jitter(0.35), 
+              size = 1,
+              colour= '#FAD510', alpha = 0.1, 
+              show.legend = FALSE) + 
+  
+  geom_boxplot(lwd=1, fill = NA, alpha=0.7) + 
+  
+  ggtitle("Frequency of antennas by each caller") + 
+  ylab("Number of antennas") + 
+  scale_y_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24)) + 
+  theme_ipsum() + 
+  theme( 
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(), 
+    legend.position = 'bottom'
+  )
+
+antenna_freq_plot
+#ggsave('antenna_freq.png', units = 'cm', width = 40, height = 30)
+```
+
+
+<p1>Calculate quantiles</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+quantile(antenna_freq$n_antennas, probs = c(0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999))
+```
+
+<p1>Omit the users (callers) that have more than three frequent antennas</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+to_remove <- antenna_freq %>% 
+  filter(n_antennas > 3)
+
+antenna_freq <- antenna_freq %>% 
+  filter(n_antennas <=3)
+```
+
+<p1>Filter the caller IDs from 'antenna_days' dataset that matches caller IDs in 'antenna_freq' dataset, so now we would have caller id as well as antenna id</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+antenna_days <- antenna_days %>% 
+  filter(antenna_days$caller %in% antenna_freq$caller)
+```
+
+<p1>Now filter the caller ID's and site IDs from 'home_locations' dataset that matches 'antenna_days' dataset, so it is possible to count the number of calls from each frequent anntena and then select the antennas from which the most calls are made</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+home_locations$user_antenna <- str_c(as.character(home_locations$caller), "-", as.character(home_locations$site_id))
+antenna_days$user_antenna <- str_c(as.character(antenna_days$caller), "-", as.character(antenna_days$site_id))
+
+home_locations <- home_locations %>% 
+  filter(home_locations$user_antenna %in% antenna_days$user_antenna)
+```
+
+
+
+<p1>Aggregate the 'home_locations' dataset by caller ID and site ID</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+home_locations_ant <- home_locations %>% 
+  group_by(caller, site_id) %>% 
+  summarise(n_calls = n())
+```
+
+
+<p1>Order the dataset by caller ID and number of calls so for each unique user first would be antenna/site ID with the most number of calls</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+home_locations_ant <- home_locations_ant[order(home_locations_ant$caller, -home_locations_ant$n_calls),]
+
+home_locations_ant <- home_locations_ant[!duplicated(home_locations_ant$caller),]
+
+
+home_locations_ant$user_antenna <- str_c(as.character(home_locations_ant$caller), "-", as.character(home_locations_ant$site_id))
+```
+
+
+
+<p1>Select the caller IDs and antena IDs from the main, 'mob_data' dataset that matches 'home_locations_ant' (which contains home locations)</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+mob_data$user_antenna <- str_c(as.character(mob_data$caller), "-", as.character(mob_data$site_id))
+
+mob_data_home <- mob_data %>% 
+  filter(mob_data$user_antenna %in% home_locations_ant$user_antenna)
+```
+
+
+<p1>Number of unique callers</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+callers <- mob_data_home %>% 
+  group_by(caller) %>% 
+  summarise(n_call = n()) %>% 
+  ungroup()
+
+cat(' The number of unique callers:', as.character(count(callers))) 
+```
+
+<p1>Number of unique callees</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+callees <-  mob_data_home %>% 
+  group_by(callee) %>% 
+  summarise(n_call = n()) %>% 
+  ungroup()
+
+cat(' The number of unique callees:', as.character(count(callees))) 
+```
+
+<p1>Now check how many users are in among both, callers and callees</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+common_users <- callers %>% 
+  filter(callers$caller %in% callees$callee)
+
+# check with opposite
+common_users1 <- callees %>% 
+  filter(callees$callee %in% callers$caller)
+
+cat(' The number of common users (among both, caller and callees):', as.character(count(common_users))) 
+```
+
+<p1>Merge common_users dataset with mob_data_home dataset</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+common_users <- common_users %>% 
+  mutate(id = caller) %>% 
+  select(id)
+
+common_users <- merge(common_users, mob_data_home, by.x = 'id', by.y = 'caller')
+
+common_users <- common_users %>% 
+  mutate(xx = lon_x, 
+         yy = lat_y, 
+         lon = x, 
+         lat = y, 
+         settl1 = settl_type, 
+         settl2 = settl_hier) %>%
+  select(id, xx, yy, lon, lat, settl1, settl2) %>% 
+  group_by(id, xx, yy, lon, lat, settl1, settl2) %>% 
+  summarise(n = n()) %>% 
+  select(id, xx, yy, lon, lat, settl1, settl2)
+
+
+
+mob_data_home <- mob_data_home %>% 
+  mutate(id = callee)
+common_users <- common_users %>% 
+  mutate(callee_id = id)
+
+mob_data_home <- merge(mob_data_home, common_users, by.x = 'id', by.y = 'id', all = FALSE)
+
+
+mob_data_home <- mob_data_home %>% 
+  mutate(ox = lon_x, 
+         oy = lat_y, 
+         dx = xx, 
+         dy = yy, 
+         o_lon = x, 
+         o_lat = y, 
+         d_lon = lon.y, 
+         d_lat = lat.y,
+         o_settl_type = settl_type, 
+         o_settl_hier = settl_hier, 
+         d_settl_type = settl1, 
+         d_settl_hier = settl2)
+```
+
+<p1>Calculate distance between call pairs</p1>
+```{r include=TRUE}
+mob_data_home <- mob_data_home %>% 
+  rowwise() %>%
+  mutate(dist_km = distm(c(ox, oy), c(dx, dy), fun = distHaversine)/1000)
+```
+
+
+<p1>Social networks dataset</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+soc_net <- mob_data_home
+
+#replace the user ID values for displaying
+repl <- head(soc_net, 1)
+repl$caller <- "xxxxxxxx"
+repl$callee <- "xxxxxxxx"
+repl
+```
+
+
+<p1>Number of unique callers</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+soc_net_callers <- soc_net %>% 
+  group_by(caller) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+```
+
+<p1>Number of unique callees</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+soc_net_callees <- soc_net %>% 
+  group_by(callee) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+```
+
+<p1>Number of unique call pairs</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+soc_net_call_pairs <- soc_net %>% 
+  group_by(caller, callee) %>% 
+  summarise(n_calls = n()) %>% 
+  ungroup()
+
+max(soc_net$dist_km)
+```
+
+<p1>Draw histogram to see the distribution of distance between call pairs</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+hist(soc_net$dist_km, probability = TRUE,  
+     main = 'Physical distance between call pairs', 
+     xlab = 'Distance: km', 
+     xlim = c(0, 375.5843), 
+     col = '#9A8822', 
+     border = "#9A8822")
+abline(v = median(soc_net$dist_km),
+       col = "#F2300F", 
+       lwd = 3)
+text(median(soc_net$dist_km), y=0.03, as.character(round(median(soc_net$dist_km), 2)), pos = 1, offset = -5, col = "black")
+```
+
+<p1>Create new field that represents the settlement types between call pairs</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+soc_net$settl_type_pairs <- str_c(soc_net$o_settl_type, " - ", soc_net$d_settl_type)
+soc_net$settl_hier_pairs <- str_c(soc_net$o_settl_hier, " - ", soc_net$d_settl_hier)
+```
+
+
+<p1>Now the social network dataset is ready for network analysis.</p1>
+
+
+# Network analysis
+## Data preparation for creating a graph
+
+<p1>Select particular columns</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+soc_net_sel <- soc_net %>% 
+  select(caller, callee, o_settl_type, o_settl_hier, d_settl_type, d_settl_hier, ox, oy, dx, dy, o_lon, o_lat, d_lon, d_lat, dist_km, settl_type_pairs, settl_hier_pairs, wday, wday_attr)
+```
+
+<p1>Create dataset of Edges</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# edgelist with not aggregated data
+edgelist <- soc_net_sel %>% 
+  select(caller, callee, dist_km, settl_type_pairs, settl_hier_pairs, wday, wday_attr) %>% 
+  mutate(dist_km_nr = dist_km,
+         dist_km = round(dist_km, 1))
+
+colnames(edgelist)[which(names(edgelist) == 'caller')] <- 'Source'
+colnames(edgelist)[which(names(edgelist) == 'callee')] <- 'Target'
+
+edgelist <- edgelist %>% 
+  mutate(Source = as.character(Source), 
+         Target = as.character(Target))
+```
+
+<p1>Aggregate edges</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+edge_weight <- edgelist %>% 
+  group_by(Source, Target, dist_km, settl_type_pairs, settl_hier_pairs) %>% 
+  summarise(weight = n()) %>% 
+  ungroup()
+
+# aggregate call pairs according to weekdays
+wdays <- edgelist %>% 
+  group_by(Source, Target, wday, wday_attr) %>% 
+  summarise(weight_wd = n()) %>% 
+  ungroup()
+
+  
+wdays$st <- str_c(as.character(wdays$Source), "-", as.character(wdays$Target))
+
+wdays <- wdays %>% 
+  select(st, wday, weight_wd)
+
+wdays <- wdays %>% 
+  spread(wday, weight_wd)
+
+
+edgelist$st <- str_c(as.character(edgelist$Source), "-", as.character(edgelist$Target))
+edge_weight$st <- str_c(as.character(edge_weight$Source), "-", as.character(edge_weight$Target))
+
+
+edge_weight <- edge_weight %>% 
+  mutate(dist_km_nr = edgelist$dist_km_nr[match(st, edgelist$st)])
+
+
+edge_weight <- edge_weight %>% 
+  mutate(weight_mon = as.numeric(wdays$`1`[match(st, wdays$st)]), 
+         weight_tues = as.numeric(wdays$`2`[match(st, wdays$st)]), 
+         weight_wed = as.numeric(wdays$`3`[match(st, wdays$st)]), 
+         weight_thur = as.numeric(wdays$`4`[match(st, wdays$st)]), 
+         weight_fri = as.numeric(wdays$`5`[match(st, wdays$st)]), 
+         weight_sat = as.numeric(wdays$`6`[match(st, wdays$st)]), 
+         weight_sun = as.numeric(wdays$`7`[match(st, wdays$st)])) %>% 
+  replace(is.na(.), 0)
+
+
+workdays <- data.frame(edge_weight$weight_mon, edge_weight$weight_tues, edge_weight$weight_wed, edge_weight$weight_thur, edge_weight$weight_fri)
+weekends <- data.frame(edge_weight$weight_sat, edge_weight$weight_sun)
+
+edge_weight <- edge_weight %>%
+   mutate(weight_workdays = rowSums(workdays), 
+         weight_weekends = rowSums(weekends))
+
+glimpse(edge_weight)
+
+edge_weight <- edge_weight %>% 
+  mutate(weight = as.numeric(weight))
+```
+
+<p1>Create dataset of Nodes</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# select callers as nodes
+nodes1 <- soc_net_sel %>% 
+  select(caller, o_settl_type, o_settl_hier, ox, oy, o_lon, o_lat)
+
+colnames(nodes1)[which(names(nodes1) == 'caller')] <- 'ID'
+colnames(nodes1)[which(names(nodes1) == 'o_settl_type')] <- 'settl_type'
+colnames(nodes1)[which(names(nodes1) == 'o_settl_hier')] <- 'settl_hier'
+colnames(nodes1)[which(names(nodes1) == 'ox')] <- 'x'
+colnames(nodes1)[which(names(nodes1) == 'oy')] <- 'y'
+colnames(nodes1)[which(names(nodes1) == 'o_lon')] <- 'lon'
+colnames(nodes1)[which(names(nodes1) == 'o_lat')] <- 'lat'
+
+
+# select callees as nodes
+nodes2 <- soc_net_sel %>% 
+  select(callee, d_settl_type, d_settl_hier, dx, dy, d_lon, d_lat)
+
+colnames(nodes2)[which(names(nodes2) == 'callee')] <- 'ID'
+colnames(nodes2)[which(names(nodes2) == 'd_settl_type')] <- 'settl_type'
+colnames(nodes2)[which(names(nodes2) == 'd_settl_hier')] <- 'settl_hier'
+colnames(nodes2)[which(names(nodes2) == 'dx')] <- 'x'
+colnames(nodes2)[which(names(nodes2) == 'dy')] <- 'y'
+colnames(nodes2)[which(names(nodes2) == 'd_lon')] <- 'lon'
+colnames(nodes2)[which(names(nodes2) == 'd_lat')] <- 'lat'
+
+# bind both nodes (caller & callees)
+nodes <- rbind(nodes1, nodes2)
+
+nodes <- nodes %>% 
+  group_by(ID, settl_type, settl_hier, x, y, lon, lat) %>% 
+  summarise(n = n()) %>% 
+  select(ID, settl_type, settl_hier, x, y, lon, lat)
+```
+
+
+<p1>Export the edgelist and nodes datasets</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# save csv
+#write_csv(edgelist, 'Data\\working\\edgelist.csv')
+#write_csv(nodes, 'Data\\working\\nodes.csv')
+```
+
+
+<p1>Simple stats</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+min(edge_weight$weight)
+max(edge_weight$weight)
+round(mean(edge_weight$weight), 2)
+median(edge_weight$weight)
+quantile(edge_weight$weight, probs = c(0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999))
+
+
+```
+
+## Create a graph
+
+
+<p1>Create matrix</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+sn_edges <- edge_weight %>% 
+  select(Source, Target)
+
+sn.mat <- as.matrix(sn_edges)
+```
+
+
+
+<p1>Create graph</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+sn_g <- graph.edgelist(sn.mat, directed = TRUE)
+
+#V(sn_g)
+#E(sn_g)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Count number of edges
+gsize(sn_g)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Count number of vertiices
+gorder(sn_g)
+```
+
+<p1>Give attributes to nodes</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+settl_type <- nodes$settl_type
+settl_hier <- nodes$settl_hier
+x <- nodes$x
+y <- nodes$y
+lon <- nodes$lon
+lat <- nodes$lat
+
+# create new vertex attributes
+sn_g <- set_vertex_attr(sn_g, 'settl_type', value = settl_type)
+sn_g <- set_vertex_attr(sn_g, 'settl_hier', value = settl_hier)
+sn_g <- set_vertex_attr(sn_g, 'x', value = x)
+sn_g <- set_vertex_attr(sn_g, 'y', value = y)
+sn_g <- set_vertex_attr(sn_g, 'lon', value = lon)
+sn_g <- set_vertex_attr(sn_g, 'lat', value = lat)
+```
+
+
+<p1>Give attributes to links</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+dist_km <- edge_weight$dist_km
+settl_type_pairs <- edge_weight$settl_type_pairs
+settl_hier_pairs <- edge_weight$settl_hier_pairs
+weight <- edge_weight$weight
+
+# create edge attributes
+sn_g <- set_edge_attr(sn_g, 'dist_km', value = dist_km)
+sn_g <- set_edge_attr(sn_g, 'settl_type_pairs', value = settl_type_pairs)
+sn_g <- set_edge_attr(sn_g, 'settl_hier_pairs', value = settl_hier_pairs)
+sn_g <- set_edge_attr(sn_g, 'weight', value = weight)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+class(sn_g)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# View all vertex attributes in a list
+#vertex_attr(sn_g)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# View attributes of first five vertices in a dataframe
+#V(sn_g)[[1:5]]
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# View edge attributes of graph object
+#edge_attr(sn_g)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# View attributes of first five edges in a dataframe
+#E(sn_g)[[1:5]]
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Find all pairs that has less than 50 km physical distance
+#E(sn_g)[[dist_km<50]]
+```
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Different way to create graph from dataframe
+#s_net <- graph_from_data_frame(d = edge_weight, vertices = nodes, directed = T)
+#s_net <- simplify(s_net, remove.loops = T)
+# combine multiple edges by summing their weights
+#s_net <- simplify(s_net, edge.attr.comb = list(weight = "sum"))
+#test <- as_data_frame(s_net, what = "edges")
+#class(s_net) #
+```
+
+# Node degrees
+
+<p1>Function degree() has: 'in-degree', 'out-degree' and 'all' or 'total' modes</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Calculate node degree with modes: all, in, out
+V(sn_g)$degree <- igraph::degree(sn_g, mode = "all")
+V(sn_g)$degree_in <- igraph::degree(sn_g, mode = "in")
+V(sn_g)$degree_out <- igraph::degree(sn_g, mode = "out")
+```
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Subgraphs according to settlement types
+sn_g_urb_bigcity <- induced_subgraph(sn_g, V(sn_g)[settl_hier=='urban: big city'])
+sn_g_urb_smallcity <- induced_subgraph(sn_g, V(sn_g)[settl_hier=='urban: small city'])
+sn_g_rural <- induced_subgraph(sn_g, V(sn_g)[settl_hier=='rural'])
+```
+
+<p1>Plot node degree distribution</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+#dev.cur()
+#dev.off()
+
+# All
+
+#png("Figures\\test.png", width = 40, height = 25, units = "cm", res = 300)
+#par(mfrow=c(2,2))
+
+hist(log(V(sn_g)$degree), 
+     probability = TRUE, 
+     main = "Whole dataset", 
+     xlab = 'log(Degree mode: all)', 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+     )
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g)$degree),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g)$degree), y=0.46, "Med", pos = 2, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g)$degree, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g)$degree, probs = 0.25), y=0.46, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g)$degree, probs = 0.75))
+text(x=4.8, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g)$degree, probs = 1))
+text(x=4.8, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g)$degree), 2))
+text(x=4.8, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+
+# Urban: Big City
+hist(log(V(sn_g_urb_bigcity)$degree), 
+     probability = TRUE, 
+     main = "Settlement type of node - Urban: Big city", 
+     xlab = 'log(Degree mode: all)', 
+     col = "#7294D4", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+     )
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g_urb_bigcity)$degree),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g_urb_bigcity)$degree), y=0.46, "Med", pos = 2, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g_urb_bigcity)$degree, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_urb_bigcity)$degree, probs = 0.25), y=0.46, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_urb_bigcity)$degree, probs = 0.75))
+text(x=4.9, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_urb_bigcity)$degree, probs = 1))
+text(x=4.9, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_urb_bigcity)$degree), 2))
+text(x=4.9, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+
+
+# Urban: Small city
+hist(log(V(sn_g_urb_smallcity)$degree), 
+     probability = TRUE, 
+     main = "Settlement type of node - Urban: Small city", 
+     xlab = 'log(Degree mode: all)', 
+     col = "#C6CDF7", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+     )
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v =quantile(V(sn_g_urb_smallcity)$degree, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_urb_smallcity)$degree, probs = 0.25), y=0.46, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+med <- str_c("Med", ": ", median(V(sn_g_urb_smallcity)$degree))
+text(x=4.45, y=0.35, med, pos = 4, col = "#737373", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_urb_smallcity)$degree, probs = 0.75))
+text(x=4.45, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_urb_smallcity)$degree, probs = 1))
+text(x=4.45, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_urb_smallcity)$degree), 2))
+text(x=4.45, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+
+
+# Rural
+hist(log(V(sn_g_rural)$degree), 
+     probability = TRUE, 
+     main = "Settlement type of node - Rural", 
+     xlab = 'log(Degree mode: all)', 
+     col = "#FAD77B", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+     )
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v =quantile(V(sn_g_rural)$degree, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_rural)$degree, probs = 0.25), y=0.46, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+med <- str_c("Med", ": ", median(V(sn_g_rural)$degree))
+text(x=4.55, y=0.35, med, pos = 4, col = "#737373", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_rural)$degree, probs = 0.75))
+text(x=4.55, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_rural)$degree, probs = 1))
+text(x=4.55, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_rural)$degree), 2))
+text(x=4.55, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+#dev.off()
+
+
+# In-degree
+
+#png("Figures\\test.png", width = 40, height = 25, units = "cm", res = 300)
+#par(mfrow=c(2,2))
+
+hist(log(V(sn_g)$degree_in), 
+     probability = TRUE, 
+     main = "Whole dataset", 
+     xlab = 'log(Degree mode: in-degree)', 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g)$degree_in),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g)$degree_in), y=0.51, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g)$degree_in, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g)$degree_in, probs = 0.25), y=0.51, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g)$degree_in, probs = 0.75))
+text(x=4.8, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g)$degree_in, probs = 1))
+text(x=4.8, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g)$degree_in), 2))
+text(x=4.8, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+# Urban: Big City
+hist(log(V(sn_g_urb_bigcity)$degree_in), 
+     probability = TRUE, 
+     main = "Settlement type of node - Urban: Big city", 
+     xlab = 'log(Degree mode: in-degree)', 
+     col = "#7294D4", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g_urb_bigcity)$degree_in),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g_urb_bigcity)$degree_in), y=0.51, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g_urb_bigcity)$degree_in, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_urb_bigcity)$degree_in, probs = 0.25), y=0.51, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_urb_bigcity)$degree_in, probs = 0.75))
+text(x=4.9, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_urb_bigcity)$degree_in, probs = 1))
+text(x=4.9, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_urb_bigcity)$degree_in), 2))
+text(x=4.9, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+# Urban: Small city
+hist(log(V(sn_g_urb_smallcity)$degree_in), 
+     probability = TRUE, 
+     main = "Settlement type of node - Urban: Small city", 
+     xlab = 'log(Degree mode: in-degree)', 
+     col = "#C6CDF7", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g_urb_smallcity)$degree_in),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g_urb_smallcity)$degree_in), y=0.51, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g_urb_smallcity)$degree_in, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_urb_smallcity)$degree_in, probs = 0.25), y=0.51, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_urb_smallcity)$degree_in, probs = 0.75))
+text(x=4.45, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_urb_smallcity)$degree_in, probs = 1))
+text(x=4.45, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_urb_smallcity)$degree_in), 2))
+text(x=4.45, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+# Rural
+hist(log(V(sn_g_rural)$degree_in), 
+     probability = TRUE, 
+     main = "Settlement type of node - Rural", 
+     xlab = 'log(Degree mode: in-degree)', 
+     col = "#FAD77B", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g_rural)$degree_in),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g_rural)$degree_in), y=0.51, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g_rural)$degree_in, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_rural)$degree_in, probs = 0.25), y=0.51, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_rural)$degree_in, probs = 0.75))
+text(x=4.55, y=0.3, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_rural)$degree_in, probs = 1))
+text(x=4.55, y=0.25, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_rural)$degree_in), 2))
+text(x=4.55, y=0.2, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+#dev.off()
+
+
+# Out-degree
+
+#png("Figures\\test.png", width = 40, height = 25, units = "cm", res = 300)
+#par(mfrow=c(2,2))
+
+hist(log(V(sn_g)$degree_out), 
+     probability = TRUE, 
+     main = "Whole dataset", 
+     xlab = 'log(Degree mode: out-degree)', 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g)$degree_out),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g)$degree_out), y=0.78, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g)$degree_out, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g)$degree_out, probs = 0.25), y=0.78, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g)$degree_out, probs = 0.75))
+text(x=2.5, y=0.47, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g)$degree_out, probs = 1))
+text(x=2.5, y=0.4, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g)$degree_out), 2))
+text(x=2.5, y=0.33, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+# Urban: Big City
+hist(log(V(sn_g_urb_bigcity)$degree_out), 
+     probability = TRUE, 
+     main = "Settlement type of node - Urban: Big city", 
+     xlab = 'log(Degree mode: out-degree)', 
+     col = "#7294D4", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g_urb_bigcity)$degree_out),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g_urb_bigcity)$degree_out), y=0.78, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g_urb_bigcity)$degree_out, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_urb_bigcity)$degree_out, probs = 0.25), y=0.78, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_urb_bigcity)$degree_out, probs = 0.75))
+text(x=2.6, y=0.47, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_urb_bigcity)$degree_out, probs = 1))
+text(x=2.6, y=0.4, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_urb_bigcity)$degree_out), 2))
+text(x=2.6, y=0.33, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+# Urban: Small city
+hist(log(V(sn_g_urb_smallcity)$degree_out), 
+     probability = TRUE, 
+     main = "Settlement type of node - Urban: Small city", 
+     xlab = 'log(Degree mode: out-degree)', 
+     col = "#C6CDF7", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g_urb_smallcity)$degree_out),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g_urb_smallcity)$degree_out), y=0.78, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g_urb_smallcity)$degree_out, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_urb_smallcity)$degree_out, probs = 0.25), y=0.78, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_urb_smallcity)$degree_out, probs = 0.75))
+text(x=2.5, y=0.47, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_urb_smallcity)$degree_out, probs = 1))
+text(x=2.5, y=0.4, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_urb_smallcity)$degree_out), 2))
+text(x=2.5, y=0.33, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+# Rural
+hist(log(V(sn_g_rural)$degree_out), 
+     probability = TRUE, 
+     main = "Settlement type of node - Rural", 
+     xlab = 'log(Degree mode: out-degree)', 
+     col = "#FAD77B", 
+     border = "#737373", 
+     col.main = "#737373", 
+     col.lab = "#737373", 
+     cex.main = 1.9, 
+     cex.lab = 1.5, 
+     xaxt = 'n', 
+     yaxt = 'n'
+)
+axis(1, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.5)
+abline(v = median(V(sn_g_rural)$degree_out),
+       col = "#5B1A18", 
+       lwd = 3, 
+       lty = 3)
+text(median(V(sn_g_rural)$degree_out), y=0.78, "Med", pos = 4, col = "#252525", cex = 1.8)
+abline(v =quantile(V(sn_g_rural)$degree_out, probs = 0.25),
+       col = "#CB2314", 
+       lwd = 3, 
+       lty = 3)
+text(quantile(V(sn_g_rural)$degree_out, probs = 0.25), y=0.78, "Q1", pos = 4, col = "#252525", cex = 1.8)
+
+q3 <- str_c("Q3", ": ", quantile(V(sn_g_rural)$degree_out, probs = 0.75))
+text(x=2.6, y=0.47, q3, pos = 4, col = "#737373", cex = 1.8)
+
+q4 <- str_c("Q4", ": ", quantile(V(sn_g_rural)$degree_out, probs = 1))
+text(x=2.6, y=0.4, q4, pos = 4, col = "#737373", cex = 1.8)
+
+avg_deg <- str_c("Avg", ": ", round(mean(V(sn_g_rural)$degree_out), 2))
+text(x=2.6, y=0.33, avg_deg, pos = 4, col = "#737373", cex = 1.8)
+
+
+
+# NOT needed yet
+
+# DEGREE DISTRIBUTION
+
+
+# Calculate degree distribution with cumulative, with modes: all, in, out
+deg_dist_all <- degree_distribution(sn_g, cumulative = T, mode = "all")
+deg_dist_in <- degree_distribution(sn_g, cumulative = T, mode = "in")
+deg_dist_out <- degree_distribution(sn_g, cumulative = T, mode = "out")
+
+
+# plot degree distribution
+# mode: all
+
+#png("Figures\\test.png", width = 40, height = 22, units = "cm", res = 300)
+#par(mfrow=c(1,1), mar=c(7, 6, 5, 1))
+
+plot( x=0:max(igraph::degree(sn_g, mode = "all")), y = 1-deg_dist_all, log = "x",
+      pch=19, cex=3, col="#9A8822",
+      xlab = "log(Degree)", ylab = "Cumulative Frequency", 
+      type = "p",
+      fg="#737373",
+      col.lab = "#737373",
+      cex.lab = 2, 
+      xaxt = 'n', 
+      yaxt = 'n')
+axis(1, 
+     
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.8)
+axis(2, 
+     col = "#737373", 
+     col.ticks = "#737373", 
+     col.axis = "#737373", 
+     cex.axis = 1.8)
+
+points(x=0:max(igraph::degree(sn_g, mode = "in")), y = 1-deg_dist_in, pch=19, log = "x",  cex=3, col="#046C9A")
+points(x=0:max(igraph::degree(sn_g, mode = "out")), y = 1-deg_dist_out, pch=19, log = "x",  cex=3, col="#ABDDDE")
+legend("bottomright", 
+       c("Mode: all", "Mode: in-degree", "Mode: out-degree"),
+       fill = c("#9A8822", "#046C9A", "#ABDDDE"),
+       bty = "n", border = "white", text.col = "#737373", cex = 1.6)
+
+
+#dev.off()
+
+```
+
+
+# Correlation between physical distance and frequency of calls
+
+<p1>Scatter plots</p1>
+```{r message=FALSE, warning=FALSE, include=TRUE, out.width="100%", out.height="100%"}
+# subsets by settlement types
+# whole dataset
+dist_weight <- edge_weight
+
+# settlement type of pairs: "urban: big city - urban: big city"
+dist_weight_ubc_ubc <- dist_weight %>% 
+  filter(settl_hier_pairs == "urban: big city - urban: big city")
+
+# settlement type of pairs: "urban: big city - urban: small city"
+dist_weight_ubc_usc <- dist_weight %>% 
+  filter(settl_hier_pairs == "urban: big city - urban: small city")
+
+# settlement type of pairs: "urban: big city - rural"
+dist_weight_ubc_r <- dist_weight %>% 
+  filter(settl_hier_pairs == "urban: big city - rural")
+
+# settlement type of pairs: "urban: small city - urban: small city"
+dist_weight_usc_usc <- dist_weight %>% 
+  filter(settl_hier_pairs == "urban: small city - urban: small city")
+
+# settlement type of pairs: "urban: small city - urban: big city"
+dist_weight_usc_ubc <- dist_weight %>% 
+  filter(settl_hier_pairs == "urban: small city - urban: big city")
+
+# settlement type of pairs: "urban: small city - rural"
+dist_weight_usc_r <- dist_weight %>% 
+  filter(settl_hier_pairs == "urban: small city - rural")
+
+# settlement type of pairs: "rural - rural"
+dist_weight_r_r <- dist_weight %>% 
+  filter(settl_hier_pairs == "rural - rural")
+
+# settlement type of pairs: "rural - urban: big city"
+dist_weight_r_ubc <- dist_weight %>% 
+  filter(settl_hier_pairs == "rural - urban: big city")
+
+# settlement type of pairs: "rural - urban: small city"
+dist_weight_r_usc <- dist_weight %>% 
+  filter(settl_hier_pairs == "rural - urban: small city")
+
+?rank
+?qnorm
+
+# Rank data
+
+dist_weight$dist_km_rank <- qnorm(rank(dist_weight$dist_km_nr, ties.method = "random")/length(dist_weight$dist_km_nr))
+dist_weight$weight_rank <- qnorm(rank(dist_weight$weight, ties.method = "random")/length(dist_weight$weight))
+dist_weight$weight_workdays_rank <- qnorm(rank(dist_weight$weight_workdays, ties.method = "random")/length(dist_weight$weight_workdays))
+dist_weight$weight_weekends_rank <- qnorm(rank(dist_weight$weight_weekends, ties.method = "random")/length(dist_weight$weight_weekends))
+
+dist_weight_ubc_ubc$dist_km_rank <- qnorm(rank(dist_weight_ubc_ubc$dist_km_nr, ties.method = "random")/length(dist_weight_ubc_ubc$dist_km_nr))
+dist_weight_ubc_ubc$weight_rank <- qnorm(rank(dist_weight_ubc_ubc$weight, ties.method = "random")/length(dist_weight_ubc_ubc$weight))
+dist_weight_ubc_ubc$weight_workdays_rank <- qnorm(rank(dist_weight_ubc_ubc$weight_workdays, ties.method = "random")/length(dist_weight_ubc_ubc$weight_workdays))
+dist_weight_ubc_ubc$weight_weekends_rank <- qnorm(rank(dist_weight_ubc_ubc$weight_weekends, ties.method = "random")/length(dist_weight_ubc_ubc$weight_weekends))
+
+dist_weight_ubc_usc$dist_km_rank <- qnorm(rank(dist_weight_ubc_usc$dist_km_nr, ties.method = "random")/length(dist_weight_ubc_usc$dist_km_nr))
+dist_weight_ubc_usc$weight_rank <- qnorm(rank(dist_weight_ubc_usc$weight, ties.method = "random")/length(dist_weight_ubc_usc$weight))
+dist_weight_ubc_usc$weight_workdays_rank <- qnorm(rank(dist_weight_ubc_usc$weight_workdays, ties.method = "random")/length(dist_weight_ubc_usc$weight_workdays))
+dist_weight_ubc_usc$weight_weekends_rank <- qnorm(rank(dist_weight_ubc_usc$weight_weekends, ties.method = "random")/length(dist_weight_ubc_usc$weight_weekends))
+
+dist_weight_ubc_r$dist_km_rank <- qnorm(rank(dist_weight_ubc_r$dist_km_nr, ties.method = "random")/length(dist_weight_ubc_r$dist_km_nr))
+dist_weight_ubc_r$weight_rank <- qnorm(rank(dist_weight_ubc_r$weight, ties.method = "random")/length(dist_weight_ubc_r$weight))
+dist_weight_ubc_r$weight_workdays_rank <- qnorm(rank(dist_weight_ubc_r$weight_workdays, ties.method = "random")/length(dist_weight_ubc_r$weight_workdays))
+dist_weight_ubc_r$weight_weekends_rank <- qnorm(rank(dist_weight_ubc_r$weight_weekends, ties.method = "random")/length(dist_weight_ubc_r$weight_weekends))
+
+dist_weight_usc_usc$dist_km_rank <- qnorm(rank(dist_weight_usc_usc$dist_km_nr, ties.method = "random")/length(dist_weight_usc_usc$dist_km_nr))
+dist_weight_usc_usc$weight_rank <- qnorm(rank(dist_weight_usc_usc$weight, ties.method = "random")/length(dist_weight_usc_usc$weight))
+dist_weight_usc_usc$weight_workdays_rank <- qnorm(rank(dist_weight_usc_usc$weight_workdays, ties.method = "random")/length(dist_weight_usc_usc$weight_workdays))
+dist_weight_usc_usc$weight_weekends_rank <- qnorm(rank(dist_weight_usc_usc$weight_weekends, ties.method = "random")/length(dist_weight_usc_usc$weight_weekends))
+
+dist_weight_usc_ubc$dist_km_rank <- qnorm(rank(dist_weight_usc_ubc$dist_km_nr, ties.method = "random")/length(dist_weight_usc_ubc$dist_km_nr))
+dist_weight_usc_ubc$weight_rank <- qnorm(rank(dist_weight_usc_ubc$weight, ties.method = "random")/length(dist_weight_usc_ubc$weight))
+dist_weight_usc_ubc$weight_workdays_rank <- qnorm(rank(dist_weight_usc_ubc$weight_workdays, ties.method = "random")/length(dist_weight_usc_ubc$weight_workdays))
+dist_weight_usc_ubc$weight_weekends_rank <- qnorm(rank(dist_weight_usc_ubc$weight_weekends, ties.method = "random")/length(dist_weight_usc_ubc$weight_weekends))
+
+dist_weight_usc_r$dist_km_rank <- qnorm(rank(dist_weight_usc_r$dist_km_nr, ties.method = "random")/length(dist_weight_usc_r$dist_km_nr))
+dist_weight_usc_r$weight_rank <- qnorm(rank(dist_weight_usc_r$weight, ties.method = "random")/length(dist_weight_usc_r$weight))
+dist_weight_usc_r$weight_workdays_rank <- qnorm(rank(dist_weight_usc_r$weight_workdays, ties.method = "random")/length(dist_weight_usc_r$weight_workdays))
+dist_weight_usc_r$weight_weekends_rank <- qnorm(rank(dist_weight_usc_r$weight_weekends, ties.method = "random")/length(dist_weight_usc_r$weight_weekends))
+
+dist_weight_r_r$dist_km_rank <- qnorm(rank(dist_weight_r_r$dist_km_nr, ties.method = "random")/length(dist_weight_r_r$dist_km_nr))
+dist_weight_r_r$weight_rank <- qnorm(rank(dist_weight_r_r$weight, ties.method = "random")/length(dist_weight_r_r$weight))
+dist_weight_r_r$weight_workdays_rank <- qnorm(rank(dist_weight_r_r$weight_workdays, ties.method = "random")/length(dist_weight_r_r$weight_workdays))
+dist_weight_r_r$weight_weekends_rank <- qnorm(rank(dist_weight_r_r$weight_weekends, ties.method = "random")/length(dist_weight_r_r$weight_weekends))
+
+dist_weight_r_ubc$dist_km_rank <- qnorm(rank(dist_weight_r_ubc$dist_km_nr, ties.method = "random")/length(dist_weight_r_ubc$dist_km_nr))
+dist_weight_r_ubc$weight_rank <- qnorm(rank(dist_weight_r_ubc$weight, ties.method = "random")/length(dist_weight_r_ubc$weight))
+dist_weight_r_ubc$weight_workdays_rank <- qnorm(rank(dist_weight_r_ubc$weight_workdays, ties.method = "random")/length(dist_weight_r_ubc$weight_workdays))
+dist_weight_r_ubc$weight_weekends_rank <- qnorm(rank(dist_weight_r_ubc$weight_weekends, ties.method = "random")/length(dist_weight_r_ubc$weight_weekends))
+
+dist_weight_r_usc$dist_km_rank <- qnorm(rank(dist_weight_r_usc$dist_km_nr, ties.method = "random")/length(dist_weight_r_usc$dist_km_nr))
+dist_weight_r_usc$weight_rank <- qnorm(rank(dist_weight_r_usc$weight, ties.method = "random")/length(dist_weight_r_usc$weight))
+dist_weight_r_usc$weight_workdays_rank <- qnorm(rank(dist_weight_r_usc$weight_workdays, ties.method = "random")/length(dist_weight_r_usc$weight_workdays))
+dist_weight_r_usc$weight_weekends_rank <- qnorm(rank(dist_weight_r_usc$weight_weekends, ties.method = "random")/length(dist_weight_r_usc$weight_weekends))
+
+
+
+# plot the normality distribution of two values, distance and weight, with not ranked and ranked data
+
+#dev.cur()
+#dev.off()
+#graphics.off() # close all devices
+#dev.list()
+
+# Physical distance
+den1 <- ggdensity(dist_weight, x="dist_km", 
+                  color="#737172", fill="#e6cf59", alpha=0.8, size=1, 
+                  title = "Density plot", 
+                  xlab = "Physical distance (km) | Tied Observations",
+                  ylab = "Density", 
+                  ggtheme = theme(
+                    axis.title = element_text(color = "#737373", size = 18),
+                    axis.text = element_text(color = "#737373", size = 16),
+                    panel.grid.major = element_line(colour = "#737373", linetype = "dotted"), 
+                    panel.background = element_rect(fill = "white", color = "#737373"),
+                    panel.border = element_rect(fill = NA, color = "#737373"), 
+                    legend.position = "none")
+  
+)
+den1
+
+den2 <- ggdensity(dist_weight, x="dist_km_rank", 
+                   color="#737172", fill="#e6cf59", size=1, 
+                   title = "Density plot", 
+                   xlab = "Physical distance (km) | Ranked Scores",
+                   ylab = "Density", 
+                   ggtheme = theme(
+                     axis.title = element_text(color = "#737373", size = 18),
+                     axis.text = element_text(color = "#737373", size = 16),
+                     panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                     panel.background = element_rect(fill = "white", color = "#737373"),
+                     panel.border = element_rect(fill = NA, color = "#737373"), 
+                     legend.position = "none")
+          
+)
+den2
+
+qq1 <- ggqqplot(dist_weight, x="dist_km",
+                color="#575c6e", size = 1.5, shape = 19,
+                title = "QQ plot", 
+                xlab = "Physical distance (km) | Tied Observations",
+                ylab = "Density", 
+                ggtheme = theme(
+                  axis.title = element_text(color = "#737373", size = 18),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "none")
+)
+qq1
+
+
+qq2 <- ggqqplot(dist_weight, x="dist_km_rank",
+                color="#575c6e", size = 1.5, shape = 19,
+                title = "QQ plot", 
+                xlab = "Physical distance (km) | Ranked Scores",
+                ylab = "Density", 
+                ggtheme = theme(
+                  axis.title = element_text(color = "#737373", size = 18),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "none")
+)
+qq2
+
+ggarrange(den1, den2, qq1, qq2, ncol = 2, nrow = 2)
+#ggsave("Figures\\5_Normality Distribution - Physical distance.png", width = 40, height = 30, units = "cm")
+
+
+# Weight: call frequency
+den1 <- ggdensity(dist_weight, x="weight", 
+                  color="#737172", fill="#e6cf59", alpha=0.8, size=1, 
+                  title = "Density plot", 
+                  xlab = "Weight: call frequency | Tied Observations",
+                  ylab = "Density", 
+                  ggtheme = theme(
+                    axis.title = element_text(color = "#737373", size = 18),
+                    axis.text = element_text(color = "#737373", size = 16),
+                    panel.grid.major = element_line(colour = "#737373", linetype = "dotted"), 
+                    panel.background = element_rect(fill = "white", color = "#737373"),
+                    panel.border = element_rect(fill = NA, color = "#737373"), 
+                    legend.position = "none")
+                  
+)
+den1
+
+den2 <- ggdensity(dist_weight, x="weight_rank", 
+                  color="#737172", fill="#e6cf59", size=1, 
+                  title = "Density plot", 
+                  xlab = "Weight: call frequency | Ranked Scores",
+                  ylab = "Density", 
+                  ggtheme = theme(
+                    axis.title = element_text(color = "#737373", size = 18),
+                    axis.text = element_text(color = "#737373", size = 16),
+                    panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                    panel.background = element_rect(fill = "white", color = "#737373"),
+                    panel.border = element_rect(fill = NA, color = "#737373"), 
+                    legend.position = "none")
+                  
+)
+den2
+
+qq1 <- ggqqplot(dist_weight, x="weight",
+                color="#575c6e", size = 1.5, shape = 19,
+                title = "QQ plot", 
+                xlab = "Weight: call frequency | Tied Observations",
+                ylab = "Density", 
+                ggtheme = theme(
+                  axis.title = element_text(color = "#737373", size = 18),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "none")
+)
+qq1
+
+
+qq2 <- ggqqplot(dist_weight, x="weight_rank",
+                color="#575c6e", size = 1.5, shape = 19,
+                title = "QQ plot", 
+                xlab = "Weight: call frequency | Ranked Scores",
+                ylab = "Density", 
+                ggtheme = theme(
+                  axis.title = element_text(color = "#737373", size = 18),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "none")
+)
+qq2
+
+ggarrange(den1, den2, qq1, qq2, ncol = 2, nrow = 2)
+#ggsave("Figures\\6_Normality Distribution - Weight-call frequency.png", width = 40, height = 30, units = "cm")
+
+
+# test correlation between physical distance and weight (call frequency) variables
+# Spearman rank correlation coefficient
+corrtest_sp <- cor.test(dist_weight$dist_km_rank, dist_weight$weight_rank, method = "spearman")
+corrtest_sp
+
+
+# Visualize data using scatter plot
+p <- ggscatter(dist_weight, x = "dist_km_rank", y = "weight_rank", 
+          add = "reg.line", 
+          add.params = list(color="#002051"),
+          conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+          xlab = "Physical distance (km) | Ranked Scores", ylab = "Weight: Frequency of calls | Ranked Scores", 
+          color = "dist_km", alpha=0.8,
+          shape = 19, 
+          size = "weight",
+          ggtheme = theme(
+            axis.title = element_text(color = "#737373", size = 19),
+            axis.text = element_text(color = "#737373", size = 16),
+            panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+            panel.background = element_rect(fill = "white", color = "#737373"),
+            panel.border = element_rect(fill = NA, color = "#737373"), 
+            legend.position = "bottom", legend.justification = "centre",
+            legend.title = element_text(color = "#737373", size = 15), 
+            legend.text = element_text(color = "#737373", size = 14))
+)
+
+p + scale_size(breaks = c(min(dist_weight$weight), max(dist_weight$weight)), 
+               guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight$dist_km), max(dist_weight$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+#ggsave("Figures\\7_Correlation between physical distance and call frequency_spearman.png", width = 40, height = 22, units = "cm")
+
+
+
+# plot by settlement types between pairs
+p1 <- ggscatter(dist_weight_ubc_ubc, x = "dist_km_rank", y = "weight_rank", 
+          add = "reg.line", 
+          add.params = list(color="#002051"),
+          conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+          xlab = "Distance", ylab = "Weight",
+          facet.by = "settl_hier_pairs",
+          color = "dist_km",  alpha=0.8,
+          size = "weight",
+          ggtheme = theme(
+            strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+            strip.text = element_text(face = "bold", color = "#525252", size = 14),
+            axis.title = element_text(color = "#737373", size = 16),
+            axis.text = element_text(color = "#737373", size = 16),
+            panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+            panel.background = element_rect(fill = "white", color = "#737373"),
+            panel.border = element_rect(fill = NA, color = "#737373"), 
+            legend.position = "bottom", legend.justification = "centre",
+            legend.title = element_text(color = "#737373", size = 14), 
+            legend.text = element_text(color = "#737373", size = 14)
+          )
+)
+pp1 <- p1 + scale_size(breaks = c(min(dist_weight_ubc_ubc$weight), max(dist_weight_ubc_ubc$weight)), 
+                       guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_ubc_ubc$dist_km), max(dist_weight_ubc_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+p2 <- ggscatter(dist_weight_ubc_usc, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight",
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp2 <- p2 + scale_size(breaks = c(min(dist_weight_ubc_usc$weight), max(dist_weight_ubc_usc$weight)), 
+                       guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_ubc_usc$dist_km), max(dist_weight_ubc_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+
+p3 <- ggscatter(dist_weight_ubc_r, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight",
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp3 <- p3 + scale_size(breaks = c(min(dist_weight_ubc_r$weight), max(dist_weight_ubc_r$weight)), 
+                       guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_ubc_r$dist_km), max(dist_weight_ubc_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+  
+
+p4 <- ggscatter(dist_weight_usc_usc, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight", 
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp4 <- p4 + scale_size(breaks = c(min(dist_weight_usc_usc$weight), max(dist_weight_usc_usc$weight)), 
+                       guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_usc_usc$dist_km), max(dist_weight_usc_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+p5 <- ggscatter(dist_weight_usc_ubc, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight", 
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp5 <- p5 + scale_size(breaks = c(min(dist_weight_usc_ubc$weight), max(dist_weight_usc_ubc$weight)), 
+                       guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_usc_ubc$dist_km), max(dist_weight_usc_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+p6 <- ggscatter(dist_weight_usc_r, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight",
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp6 <- p6 +  scale_size(breaks = c(min(dist_weight_usc_r$weight), max(dist_weight_usc_r$weight)), 
+                        guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_usc_r$dist_km), max(dist_weight_usc_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+p7 <- ggscatter(dist_weight_r_r, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight", 
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp7 <- p7 +  scale_size(breaks = c(min(dist_weight_r_r$weight), max(dist_weight_r_r$weight)), 
+                        guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_r_r$dist_km), max(dist_weight_r_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+p8 <- ggscatter(dist_weight_r_ubc, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight", 
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp8 <- p8 +  scale_size(breaks = c(min(dist_weight_r_ubc$weight), max(dist_weight_r_ubc$weight)), 
+                        guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_r_ubc$dist_km), max(dist_weight_r_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+p9 <- ggscatter(dist_weight_r_usc, x = "dist_km_rank", y = "weight_rank", 
+                add = "reg.line", 
+                add.params = list(color="#002051"),
+                conf.int = TRUE, 
+                cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                xlab = "Distance", ylab = "Weight", 
+                facet.by = "settl_hier_pairs",
+                color = "dist_km", alpha=0.8,
+                size = "weight",
+                ggtheme = theme(
+                  strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                  strip.text = element_text(face = "bold", color = "#525252", size = 14),
+                  axis.title = element_text(color = "#737373", size = 16),
+                  axis.text = element_text(color = "#737373", size = 16),
+                  panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                  panel.background = element_rect(fill = "white", color = "#737373"),
+                  panel.border = element_rect(fill = NA, color = "#737373"), 
+                  legend.position = "bottom", legend.justification = "centre",
+                  legend.title = element_text(color = "#737373", size = 14), 
+                  legend.text = element_text(color = "#737373", size = 14)
+                )
+)
+
+
+pp9 <- p9 +  scale_size(breaks = c(min(dist_weight_r_usc$weight), max(dist_weight_r_usc$weight)), 
+                        guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fdea45", "#e6cf59", "#c3b56d", "#a49d78", "#8b8677", "#737172", 
+                                    "#575c6e", "#33486e", "#0d346b", "#002051"), 
+                        breaks=c(min(dist_weight_r_usc$dist_km), max(dist_weight_r_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5))
+
+
+ggarrange(pp1, pp2, pp3, pp4, pp5, pp6, pp7, pp8, pp9, ncol = 3, nrow = 3)
+
+#ggsave("Figures\\8_Correlation between physical distance and call frequency_spearman_bySettlTypes.png", width = 40, height = 36, units = "cm")
+
+
+
+# Plot correlations by workdays and weekends
+
+pworkd <- ggscatter(dist_weight, x = "dist_km_rank", y = "weight_workdays_rank", 
+               add = "reg.line", 
+               add.params = list(color="#002051"),
+               conf.int = TRUE, 
+               cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+               xlab = "Physical distance (km) | Ranked Scores", ylab = "Weight: Frequency of calls | Ranked Scores", 
+               color = "dist_km", alpha=0.8,
+               shape = 19, 
+               size = "weight_workdays",
+               ggtheme = theme(
+                 plot.title = element_text(color = "#737373", size = 21),
+                 axis.title = element_text(color = "#737373", size = 19),
+                 axis.text = element_text(color = "#737373", size = 16),
+                 panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                 panel.background = element_rect(fill = "white", color = "#737373"),
+                 panel.border = element_rect(fill = NA, color = "#737373"), 
+                 legend.position = "bottom", legend.justification = "centre",
+                 legend.title = element_text(color = "#737373", size = 15), 
+                 legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd <- pworkd + scale_size(breaks = c(min(dist_weight$weight_workdays), max(dist_weight$weight_workdays)), 
+                              guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                                     "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                          breaks=c(min(dist_weight$dist_km), max(dist_weight$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+  
+
+pwkn <- ggscatter(dist_weight, x = "dist_km_rank", y = "weight_weekends_rank", 
+                    add = "reg.line", 
+                    add.params = list(color="#002051"),
+                    conf.int = TRUE, 
+                    cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                    xlab = "Physical distance (km) | Ranked Scores", ylab = "Weight: Frequency of calls | Ranked Scores", 
+                    color = "dist_km", alpha=0.8,
+                    shape = 19, 
+                    size = "weight_weekends",
+                    ggtheme = theme(
+                      plot.title = element_text(color = "#737373", size = 21),
+                      axis.title = element_text(color = "#737373", size = 19),
+                      axis.text = element_text(color = "#737373", size = 16),
+                      panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                      panel.background = element_rect(fill = "white", color = "#737373"),
+                      panel.border = element_rect(fill = NA, color = "#737373"), 
+                      legend.position = "bottom", legend.justification = "centre",
+                      legend.title = element_text(color = "#737373", size = 15), 
+                      legend.text = element_text(color = "#737373", size = 14))
+)
+
+pwkn <- pwkn + scale_size(breaks = c(min(dist_weight$weight_weekends), max(dist_weight$weight_weekends)), 
+                          guide = guide_legend(title = "Call frequency: (min-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                                 "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                               breaks=c(min(dist_weight$dist_km), max(dist_weight$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+  
+
+
+ggarrange(pworkd, pwkn, ncol = 2, nrow = 1)
+
+#ggsave("Figures\\9_Correlation between physical distance and call frequency_spearman_byWeekDays.png", width = 40, height = 22, units = "cm")
+
+
+# Plot correlations by workdays and weekends & settlement types
+# UBC
+# dist_weight_ubc_ubc
+pworkd_ubc1 <- ggscatter(dist_weight_ubc_ubc, x = "dist_km_rank", y = "weight_workdays_rank", 
+                    add = "reg.line", 
+                    add.params = list(color="#002051"),
+                    conf.int = TRUE, 
+                    cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                    xlab = "Distance", ylab = "Weight",
+                    facet.by = "settl_hier_pairs",
+                    color = "dist_km", alpha=0.8,
+                    shape = 19, 
+                    size = "weight_workdays",
+                    ggtheme = theme(
+                      strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                      strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                      plot.title = element_text(color = "#737373", size = 18),
+                      axis.title = element_text(color = "#737373", size = 16),
+                      axis.text = element_text(color = "#737373", size = 16),
+                      panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                      panel.background = element_rect(fill = "white", color = "#737373"),
+                      panel.border = element_rect(fill = NA, color = "#737373"), 
+                      legend.position = "bottom", legend.justification = "centre",
+                      legend.title = element_text(color = "#737373", size = 14), 
+                      legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_ubc1 <- pworkd_ubc1 + scale_size(breaks = c(min(dist_weight_ubc_ubc$weight_workdays), median(dist_weight_ubc_ubc$weight_workdays), max(dist_weight_ubc_ubc$weight_workdays)), 
+                              guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_ubc_ubc$dist_km), median(dist_weight_ubc_ubc$dist_km), max(dist_weight_ubc_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_ubc2 <- ggscatter(dist_weight_ubc_ubc, x = "dist_km_rank", y = "weight_weekends_rank", 
+                  add = "reg.line", 
+                  add.params = list(color="#002051"),
+                  conf.int = TRUE, 
+                  cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                  xlab = "Distance", ylab = "Weight",
+                  facet.by = "settl_hier_pairs",
+                  color = "dist_km", alpha=0.8,
+                  shape = 19, 
+                  size = "weight_weekends",
+                  ggtheme = theme(
+                    strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                    strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                    plot.title = element_text(color = "#737373", size = 18),
+                    axis.title = element_text(color = "#737373", size = 16),
+                    axis.text = element_text(color = "#737373", size = 16),
+                    panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                    panel.background = element_rect(fill = "white", color = "#737373"),
+                    panel.border = element_rect(fill = NA, color = "#737373"), 
+                    legend.position = "bottom", legend.justification = "centre",
+                    legend.title = element_text(color = "#737373", size = 14), 
+                    legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_ubc2 <- pworkd_ubc2 + scale_size(breaks = c(min(dist_weight_ubc_ubc$weight_weekends), median(dist_weight_ubc_ubc$weight_weekends), max(dist_weight_ubc_ubc$weight_weekends)), 
+                          guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_ubc_ubc$dist_km), median(dist_weight_ubc_ubc$dist_km), max(dist_weight_ubc_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+
+# dist_weight_ubc_usc
+pworkd_ubc3 <- ggscatter(dist_weight_ubc_usc, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_ubc3 <- pworkd_ubc3 + scale_size(breaks = c(min(dist_weight_ubc_usc$weight_workdays), median(dist_weight_ubc_usc$weight_workdays), max(dist_weight_ubc_usc$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_ubc_usc$dist_km), median(dist_weight_ubc_usc$dist_km), max(dist_weight_ubc_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_ubc4 <- ggscatter(dist_weight_ubc_usc, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_ubc4 <- pworkd_ubc4 + scale_size(breaks = c(min(dist_weight_ubc_usc$weight_weekends), median(dist_weight_ubc_usc$weight_weekends), max(dist_weight_ubc_usc$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_ubc_usc$dist_km), median(dist_weight_ubc_usc$dist_km), max(dist_weight_ubc_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+# dist_weight_ubc_r
+pworkd_ubc5 <- ggscatter(dist_weight_ubc_r, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight", 
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_ubc5 <- pworkd_ubc5 + scale_size(breaks = c(min(dist_weight_ubc_r$weight_workdays), median(dist_weight_ubc_r$weight_workdays), max(dist_weight_ubc_r$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_ubc_r$dist_km), median(dist_weight_ubc_r$dist_km), max(dist_weight_ubc_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_ubc6 <- ggscatter(dist_weight_ubc_r, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_ubc6 <- pworkd_ubc6 + scale_size(breaks = c(min(dist_weight_ubc_r$weight_weekends), median(dist_weight_ubc_r$weight_weekends), max(dist_weight_ubc_r$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_ubc_r$dist_km), median(dist_weight_ubc_r$dist_km), max(dist_weight_ubc_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+
+
+ggarrange(pworkd_ubc1, pworkd_ubc2, pworkd_ubc3, pworkd_ubc4, pworkd_ubc5, pworkd_ubc6, ncol = 2, nrow = 3)
+
+#ggsave("Figures\\10_Correlation between physical distance and call frequency_spearman_byWeekDays_SettlUBC.png", width = 40, height = 40, units = "cm")
+
+
+
+
+# USC
+# dist_weight_usc_usc
+pworkd_usc1 <- ggscatter(dist_weight_usc_usc, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_usc1 <- pworkd_usc1 + scale_size(breaks = c(min(dist_weight_usc_usc$weight_workdays), median(dist_weight_usc_usc$weight_workdays), max(dist_weight_usc_usc$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_usc_usc$dist_km), median(dist_weight_usc_usc$dist_km), max(dist_weight_usc_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_usc2 <- ggscatter(dist_weight_usc_usc, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_usc2 <- pworkd_usc2 + scale_size(breaks = c(min(dist_weight_usc_usc$weight_weekends), median(dist_weight_usc_usc$weight_weekends), max(dist_weight_usc_usc$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_usc_usc$dist_km), median(dist_weight_usc_usc$dist_km), max(dist_weight_usc_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+
+# dist_weight_usc_ubc
+pworkd_usc3 <- ggscatter(dist_weight_usc_ubc, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_usc3 <- pworkd_usc3 + scale_size(breaks = c(min(dist_weight_usc_ubc$weight_workdays), median(dist_weight_usc_ubc$weight_workdays), max(dist_weight_usc_ubc$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_usc_ubc$dist_km), median(dist_weight_usc_ubc$dist_km), max(dist_weight_usc_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_usc4 <- ggscatter(dist_weight_usc_ubc, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_usc4 <- pworkd_usc4 + scale_size(breaks = c(min(dist_weight_usc_ubc$weight_weekends), median(dist_weight_usc_ubc$weight_weekends), max(dist_weight_usc_ubc$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_usc_ubc$dist_km), median(dist_weight_usc_ubc$dist_km), max(dist_weight_usc_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+# dist_weight_usc_r
+pworkd_usc5 <- ggscatter(dist_weight_usc_r, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight", 
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_usc5 <- pworkd_usc5 + scale_size(breaks = c(min(dist_weight_usc_r$weight_workdays), median(dist_weight_usc_r$weight_workdays), max(dist_weight_usc_r$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_usc_r$dist_km), median(dist_weight_usc_r$dist_km), max(dist_weight_usc_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_usc6 <- ggscatter(dist_weight_usc_r, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_usc6 <- pworkd_usc6 + scale_size(breaks = c(min(dist_weight_usc_r$weight_weekends), median(dist_weight_usc_r$weight_weekends), max(dist_weight_usc_r$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_usc_r$dist_km), median(dist_weight_usc_r$dist_km), max(dist_weight_usc_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+
+
+ggarrange(pworkd_usc1, pworkd_usc2, pworkd_usc3, pworkd_usc4, pworkd_usc5, pworkd_usc6, ncol = 2, nrow = 3)
+
+#ggsave("Figures\\11_Correlation between physical distance and call frequency_spearman_byWeekDays_SettlUSC.png", width = 40, height = 40, units = "cm")
+
+
+
+
+# R
+# dist_weight_r_r
+pworkd_r1 <- ggscatter(dist_weight_r_r, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_r1 <- pworkd_r1 + scale_size(breaks = c(min(dist_weight_r_r$weight_workdays), median(dist_weight_r_r$weight_workdays), max(dist_weight_r_r$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_r_r$dist_km), median(dist_weight_r_r$dist_km), max(dist_weight_r_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_r2 <- ggscatter(dist_weight_r_r, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_r2 <- pworkd_r2 + scale_size(breaks = c(min(dist_weight_r_r$weight_weekends), median(dist_weight_r_r$weight_weekends), max(dist_weight_r_r$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_r_r$dist_km), median(dist_weight_r_r$dist_km), max(dist_weight_r_r$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+
+# dist_weight_r_ubc
+pworkd_r3 <- ggscatter(dist_weight_r_ubc, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_r3 <- pworkd_r3 + scale_size(breaks = c(min(dist_weight_r_ubc$weight_workdays), median(dist_weight_r_ubc$weight_workdays), max(dist_weight_r_ubc$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_r_ubc$dist_km), median(dist_weight_r_ubc$dist_km), max(dist_weight_r_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_r4 <- ggscatter(dist_weight_r_ubc, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_r4 <- pworkd_r4 + scale_size(breaks = c(min(dist_weight_r_ubc$weight_weekends), median(dist_weight_r_ubc$weight_weekends), max(dist_weight_r_ubc$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_r_ubc$dist_km), median(dist_weight_r_ubc$dist_km), max(dist_weight_r_ubc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+# dist_weight_r_usc
+pworkd_r5 <- ggscatter(dist_weight_r_usc, x = "dist_km_rank", y = "weight_workdays_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight", 
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_workdays",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_r5 <- pworkd_r5 + scale_size(breaks = c(min(dist_weight_r_usc$weight_workdays), median(dist_weight_r_usc$weight_workdays), max(dist_weight_r_usc$weight_workdays)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_r_usc$dist_km), median(dist_weight_r_usc$dist_km), max(dist_weight_r_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Workdays") 
+
+
+pworkd_r6 <- ggscatter(dist_weight_r_usc, x = "dist_km_rank", y = "weight_weekends_rank", 
+                         add = "reg.line", 
+                         add.params = list(color="#002051"),
+                         conf.int = TRUE, 
+                         cor.coef = TRUE, cor.method = "spearman", cor.coef.size = 5, 
+                         xlab = "Distance", ylab = "Weight",
+                         facet.by = "settl_hier_pairs",
+                         color = "dist_km", alpha=0.8,
+                         shape = 19, 
+                         size = "weight_weekends",
+                         ggtheme = theme(
+                           strip.background = element_rect(fill = "#D3DDDC", color = "#D3DDDC"), 
+                           strip.text = element_text(face = "bold", color = "#525252", size = 16),
+                           plot.title = element_text(color = "#737373", size = 18),
+                           axis.title = element_text(color = "#737373", size = 16),
+                           axis.text = element_text(color = "#737373", size = 16),
+                           panel.grid.major = element_line(colour = "#737373", linetype = "dotted"),
+                           panel.background = element_rect(fill = "white", color = "#737373"),
+                           panel.border = element_rect(fill = NA, color = "#737373"), 
+                           legend.position = "bottom", legend.justification = "centre",
+                           legend.title = element_text(color = "#737373", size = 14), 
+                           legend.text = element_text(color = "#737373", size = 14))
+)
+
+pworkd_r6 <- pworkd_r6 + scale_size(breaks = c(min(dist_weight_r_usc$weight_weekends), median(dist_weight_r_usc$weight_weekends), max(dist_weight_r_usc$weight_weekends)), 
+                                        guide = guide_legend(title = "Call frequency: (min-med-max)", title.position = "top", title.hjust = 0.5)) + 
+  scale_color_gradientn(colours = c("#fcfdbf", "#feca8d", "#fd9668", "#f1605d", "#cd4071", 
+                                    "#9e2f7f", "#721f81", "#440f76", "#180f3d", "#000004"), 
+                        breaks=c(min(dist_weight_r_usc$dist_km), median(dist_weight_r_usc$dist_km), max(dist_weight_r_usc$dist_km))) + 
+  guides(color=guide_colorbar(title = "Distance (km)", title.position = "top", title.hjust = 0.5)) + 
+  labs(title = "Weekends") 
+
+
+
+ggarrange(pworkd_r1, pworkd_r2, pworkd_r3, pworkd_r4, pworkd_r5, pworkd_r6, ncol = 2, nrow = 3)
+
+#ggsave("Figures\\12_Correlation between physical distance and call frequency_spearman_byWeekDays_SettlR.png", width = 40, height = 44, units = "cm")
+
+
+
+```
+
+
+
